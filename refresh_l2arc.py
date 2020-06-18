@@ -113,7 +113,8 @@ def print_total_bytes(large_data, do_table=True, style='ascii'):
         data = [headers]
         lgd = large_data[2]
         lgd[:, 0] = np.apply_along_axis(lambda x: x[0].name, 1, lgd)
-        data.append(lgd.tolist())
+        data = [headers]
+        [data.append(v) for v in lgd]
 
         if style == 'markdown':
             table = terminaltables.GithubFlavoredMarkdownTable(data)
