@@ -7,8 +7,8 @@ from pathlib import Path
 
 import click
 import numpy as np
-from joblib import Parallel, delayed
 import terminaltables
+from joblib import Parallel, delayed
 
 g_max_reads = 4096
 g_randomize_reads = False
@@ -45,25 +45,25 @@ def random_read_file(path):
                 if cur_time - start_time > g_max_read_time_secs:
                     num_reads = max_reads
 
-    return np.array([path,gbg_data, nbytes])
+    return [path, gbg_data, nbytes]
 
 
-def read_all_paths(path_list, njobs,list_files = True):
+def read_all_paths(path_list, njobs, list_files=True):
     total_bytes = 0
     total_gbg_data = 0
     data_totals_tabulate = []
     if len(path_list) > 1 and njobs > 1:
         with Parallel(n_jobs=njobs, verbose=10) as parallel:
-            gbg_data = parallel(delayed(random_read_file)(p) for p in path_list)
+            gbg_data = np.array(parallel(delayed(random_read_file)(p) for p in path_list))
             if list_files:
-                data_totals_tabulate.append(gbg_data)
-            gbg_data_szs = gbg_data[:,1:]
+                data_totals_tabulate = gbg_data
+            gbg_data_szs = gbg_data[:, 1:]
             total_gbg_data, total_bytes = np.sum(gbg_data_szs, axis=0)
     else:
         for p in path_list:
             fn, gbg, tb = random_read_file(p)
             if list_files:
-                data_totals_tabulate.append([fn,gbg,tb])
+                data_totals_tabulate.append([fn, gbg, tb])
             total_bytes += tb
             total_gbg_data += gbg
 
@@ -94,7 +94,7 @@ def read_folder(current_folder, glob_pattern):
     return v
 
 
-def print_total_bytes(large_data,do_table=True,style='single'):
+def print_total_bytes(large_data, do_table=True, style='single'):
     """
 
     :param large_data:
@@ -102,28 +102,26 @@ def print_total_bytes(large_data,do_table=True,style='single'):
     :param style: can be ascii, markdown, or single. Sets the table style
     :return:
     """
-    gbg_data = large_data[0:1] if len(large_data) > 2 else large_data
+    gbg_data = large_data[0:2] if len(large_data) > 2 else large_data
     # click.secho(f"Dbg: {gbg_data}",fg="blue")
     total_bytes = sizeof_fmt(gbg_data[1])
     gbg_bytes = sizeof_fmt(gbg_data[0])
     click.secho(f"Read {total_bytes}", fg="green")
     click.secho(f"GBG Res: {gbg_bytes}", fg="green")
     if do_table:
-        headers = ['Filename','Bytes Read','Filesize']
-        data = headers + large_data[2]
-        if style == 'single':
-            table = terminaltables.AsciiTable(data)
-        elif style == 'markdown':
+        headers = ['Filename', 'Bytes Read', 'Filesize']
+        data = [headers]
+        lgd = large_data[2]
+        lgd[:, 0] = np.apply_along_axis(lambda x: x[0].name, 1, lgd)
+        data.append(lgd.tolist())
+
+        if style == 'markdown':
             table = terminaltables.GithubFlavoredMarkdownTable(data)
+        elif style == 'ascii':
+            table = terminaltables.AsciiTable(data)
         else:
             table = terminaltables.SingleTable(data)
-        click.secho(table)
-
-
-
-
-
-
+        click.secho(f"{table.table}")
 
 
 @click.group()
@@ -206,8 +204,8 @@ def deep_read(ctx, start_loc, glob_pattern):
 
     click.secho(f"Reading in {len(paths)} files...", fg="green")
 
-    dta = read_all_paths(paths, njobs,do_table)
-    print_total_bytes(dta,do_table)
+    dta = read_all_paths(paths, njobs, do_table)
+    print_total_bytes(dta, do_table)
 
 
 cli.add_command(read)
