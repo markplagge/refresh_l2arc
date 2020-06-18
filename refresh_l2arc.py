@@ -94,7 +94,7 @@ def read_folder(current_folder, glob_pattern):
     return v
 
 
-def print_total_bytes(large_data, do_table=True, style='single'):
+def print_total_bytes(large_data, do_table=True, style='ascii'):
     """
 
     :param large_data:
