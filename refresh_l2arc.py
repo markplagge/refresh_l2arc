@@ -2,6 +2,7 @@
 
 import mmap
 import random
+import timeit
 from pathlib import Path
 
 import click
@@ -10,6 +11,7 @@ from joblib import Parallel, delayed
 
 g_max_reads = 4096
 g_randomize_reads = False
+g_max_read_time_secs = 60
 
 
 def do_random_with_read(read_byte):
@@ -20,10 +22,12 @@ def do_random_with_read(read_byte):
 
 def random_read_file(path):
     global g_max_reads
+    global g_max_read_time_secs
     gbg_data = 0
     with open(path, 'rb', buffering=0) as f:
         nbytes = f.seek(0, 2)
         nactual = f.tell()
+        start_time = timeit.default_timer()
         with mmap.mmap(f.fileno(), nactual, prot=mmap.PROT_READ) as f_map:
             # read_locs = np.arange(0,len(f_map))
             # np.random.shuffle(read_locs)
@@ -35,6 +39,11 @@ def random_read_file(path):
                 gd = do_random_with_read(d)
                 gbg_data += gd
                 num_reads += d
+
+                cur_time = timeit.default_timer()
+                if cur_time - start_time > g_max_read_time_secs:
+                    break
+
     return [gbg_data, nbytes]
 
 
@@ -91,14 +100,18 @@ def print_total_bytes(gbg_data):
 
 @click.group()
 @click.option("--njobs", default=16, help="number of processes to run")
-@click.option('--max_reads', '-M', default=4096,
+@click.option('--max-reads', '-M', default=4096,
               help="Max bytes to read from each file. If negative will be set to the size of the file")
-@click.option('--random_max_reads', '-R', default=False, is_flag=True,
+@click.option('--random-max-reads', '-R', default=False, is_flag=True,
               help="Randomize max read sizes (Not implemented yet)")
+@click.option('--read-timeout', '-T', default=60.0,
+              help="Max seconds to spend reading from a file (an override to max_reads)")
 @click.pass_context
-def cli(ctx, njobs, max_reads, random_max_reads):
+def cli(ctx, njobs, max_reads, random_max_reads, read_timeout):
+    global g_max_read_time_secs
     global g_max_reads
     global g_randomize_reads
+    g_max_read_time_secs = read_timeout
     g_max_reads = max_reads
     g_randomize_reads = random_max_reads
 
