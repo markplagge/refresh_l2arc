@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 import numpy as np
 from joblib import Parallel, delayed
+import terminaltables
 
 g_max_reads = 4096
 g_randomize_reads = False
@@ -42,28 +43,31 @@ def random_read_file(path):
 
                 cur_time = timeit.default_timer()
                 if cur_time - start_time > g_max_read_time_secs:
-                    break
+                    num_reads = max_reads
 
-    return [gbg_data, nbytes]
+    return np.array([path,gbg_data, nbytes])
 
 
-def read_all_paths(path_list, njobs):
+def read_all_paths(path_list, njobs,list_files = True):
     total_bytes = 0
     total_gbg_data = 0
+    data_totals_tabulate = []
     if len(path_list) > 1 and njobs > 1:
         with Parallel(n_jobs=njobs, verbose=10) as parallel:
-
             gbg_data = parallel(delayed(random_read_file)(p) for p in path_list)
-            print(gbg_data)
-
-            total_gbg_data, total_bytes = np.sum(gbg_data, axis=0)
+            if list_files:
+                data_totals_tabulate.append(gbg_data)
+            gbg_data_szs = gbg_data[:,1:]
+            total_gbg_data, total_bytes = np.sum(gbg_data_szs, axis=0)
     else:
         for p in path_list:
-            gbg, tb = random_read_file(p)
+            fn, gbg, tb = random_read_file(p)
+            if list_files:
+                data_totals_tabulate.append([fn,gbg,tb])
             total_bytes += tb
             total_gbg_data += gbg
 
-    return total_gbg_data, total_bytes
+    return total_gbg_data, total_bytes, data_totals_tabulate
 
 
 def sizeof_fmt(num, suffix='B'):
@@ -90,12 +94,36 @@ def read_folder(current_folder, glob_pattern):
     return v
 
 
-def print_total_bytes(gbg_data):
+def print_total_bytes(large_data,do_table=True,style='single'):
+    """
+
+    :param large_data:
+    :param do_table:
+    :param style: can be ascii, markdown, or single. Sets the table style
+    :return:
+    """
+    gbg_data = large_data[0:1] if len(large_data) > 2 else large_data
     # click.secho(f"Dbg: {gbg_data}",fg="blue")
     total_bytes = sizeof_fmt(gbg_data[1])
     gbg_bytes = sizeof_fmt(gbg_data[0])
     click.secho(f"Read {total_bytes}", fg="green")
     click.secho(f"GBG Res: {gbg_bytes}", fg="green")
+    if do_table:
+        headers = ['Filename','Bytes Read','Filesize']
+        data = headers + large_data[2]
+        if style == 'single':
+            table = terminaltables.AsciiTable(data)
+        elif style == 'markdown':
+            table = terminaltables.GithubFlavoredMarkdownTable(data)
+        else:
+            table = terminaltables.SingleTable(data)
+        click.secho(table)
+
+
+
+
+
+
 
 
 @click.group()
@@ -106,8 +134,9 @@ def print_total_bytes(gbg_data):
               help="Randomize max read sizes (Not implemented yet)")
 @click.option('--read-timeout', '-T', default=60.0,
               help="Max seconds to spend reading from a file (an override to max_reads)")
+@click.option('--table', default=False, is_flag=True, help="print out table of files touched")
 @click.pass_context
-def cli(ctx, njobs, max_reads, random_max_reads, read_timeout):
+def cli(ctx, njobs, max_reads, random_max_reads, read_timeout, table):
     global g_max_read_time_secs
     global g_max_reads
     global g_randomize_reads
@@ -122,6 +151,7 @@ def cli(ctx, njobs, max_reads, random_max_reads, read_timeout):
 
     ctx.ensure_object(dict)
     ctx.obj['njobs'] = njobs
+    ctx.obj['do_table'] = table
 
 
 @click.command()
@@ -175,8 +205,8 @@ def deep_read(ctx, start_loc, glob_pattern):
 
     click.secho(f"Reading in {len(paths)} files...", fg="green")
 
-    dta = read_all_paths(paths, njobs)
-    print_total_bytes(dta)
+    dta = read_all_paths(paths, njobs,ctx['do_table'])
+    print_total_bytes(dta,ctx['do_table'])
 
 
 cli.add_command(read)
