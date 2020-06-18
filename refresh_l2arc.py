@@ -122,7 +122,7 @@ def print_total_bytes(large_data, do_table=True, style='ascii'):
             table = terminaltables.AsciiTable(data)
         else:
             table = terminaltables.SingleTable(data)
-        click.secho(f"{table.table}")
+        click.echo_via_pager(f"{table.table}")
 
 
 @click.group()
