@@ -198,6 +198,7 @@ def deep_read(ctx, start_loc, glob_pattern):
     """
     ctx.ensure_object(dict)
     njobs = ctx.obj['njobs']
+    do_table = ctx.obj['do_table']
     click.secho(f"Reading files in {start_loc}...", fg="green")
 
     start_loc = Path(start_loc)
@@ -205,8 +206,8 @@ def deep_read(ctx, start_loc, glob_pattern):
 
     click.secho(f"Reading in {len(paths)} files...", fg="green")
 
-    dta = read_all_paths(paths, njobs,ctx['do_table'])
-    print_total_bytes(dta,ctx['do_table'])
+    dta = read_all_paths(paths, njobs,do_table)
+    print_total_bytes(dta,do_table)
 
 
 cli.add_command(read)
