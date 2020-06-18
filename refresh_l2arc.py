@@ -134,8 +134,9 @@ def print_total_bytes(large_data, do_table=True, style='ascii'):
 @click.option('--read-timeout', '-T', default=60.0,
               help="Max seconds to spend reading from a file (an override to max_reads)")
 @click.option('--table', default=False, is_flag=True, help="print out table of files touched")
+@click.option('--table-fmt', default='single', help="Table format style (single, ascii, markdown)")
 @click.pass_context
-def cli(ctx, njobs, max_reads, random_max_reads, read_timeout, table):
+def cli(ctx, njobs, max_reads, random_max_reads, read_timeout, table, table_fmt):
     global g_max_read_time_secs
     global g_max_reads
     global g_randomize_reads
@@ -151,7 +152,7 @@ def cli(ctx, njobs, max_reads, random_max_reads, read_timeout, table):
     ctx.ensure_object(dict)
     ctx.obj['njobs'] = njobs
     ctx.obj['do_table'] = table
-
+    ctx.obj['table_fmt'] = table_fmt
 
 @click.command()
 @click.argument('paths', nargs=-1, type=click.Path(exists=True, file_okay=True))
@@ -198,6 +199,7 @@ def deep_read(ctx, start_loc, glob_pattern):
     ctx.ensure_object(dict)
     njobs = ctx.obj['njobs']
     do_table = ctx.obj['do_table']
+    table_fmt = ctx.obj['table_fmt']
     click.secho(f"Reading files in {start_loc}...", fg="green")
 
     start_loc = Path(start_loc)
@@ -206,7 +208,7 @@ def deep_read(ctx, start_loc, glob_pattern):
     click.secho(f"Reading in {len(paths)} files...", fg="green")
 
     dta = read_all_paths(paths, njobs, do_table)
-    print_total_bytes(dta, do_table)
+    print_total_bytes(dta, do_table, table_fmt)
 
 
 cli.add_command(read)
